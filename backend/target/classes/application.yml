@@ -3,15 +3,15 @@ spring:
     name: skillforge-backend
 
   datasource:
-    url: ${DB_URL}          # e.g. jdbc:postgresql://<supabase-host>:5432/postgres
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: ${DB_URL:jdbc:h2:mem:testdb}          # e.g. jdbc:postgresql://<supabase-host>:5432/postgres
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD:}
     hikari:
       maximum-pool-size: 10
 
   jpa:
     hibernate:
-      ddl-auto: validate      # Preetham owns migrations; app should never auto-generate schema
+      ddl-auto: create-drop      # use create-drop for in‑memory DB during dev
     show-sql: false
     properties:
       hibernate:
@@ -21,7 +21,7 @@ server:
   port: ${PORT:8080}
 
 jwt:
-  secret: ${JWT_SECRET}        # HS256 signing secret - never commit a real value
+  secret: ${JWT_SECRET:testsecret}        # HS256 signing secret - default for dev
   access-token-expiry-minutes: 15
   refresh-token-expiry-days: 7
 
