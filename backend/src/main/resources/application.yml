@@ -29,8 +29,7 @@ jwt:
   secret: ${JWT_SECRET:SF-DEFAULT-JWT-SECRET-KEY-2026-MUST-BE-AT-LEAST-256-BITS-LONG}
   access-token-expiry-minutes: 15
   refresh-token-expiry-days: 7
-
- refresh-token-expiry-seconds: ${REFRESH_TOKEN_EXPIRY_SECONDS:604800}
+  refresh-token-expiry-seconds: ${REFRESH_TOKEN_EXPIRY_SECONDS:604800}
 
 admin:
   provisioning:
