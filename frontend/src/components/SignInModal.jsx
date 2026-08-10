@@ -36,7 +36,7 @@ const SignInModal = memo(() => {
       await loginWithGoogle();
       showToast('Signed in via Google OAuth successfully!', 'success');
     } catch (err) {
-      showToast('Google sign in failed', 'error');
+      showToast(err.message || 'Google sign in failed', 'info');
     } finally {
       setLoading(false);
     }

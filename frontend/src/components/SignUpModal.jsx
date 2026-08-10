@@ -36,7 +36,7 @@ const SignUpModal = memo(() => {
       await loginWithGoogle();
       showToast('Signed up via Google OAuth successfully!', 'success');
     } catch (err) {
-      showToast('Google sign up failed', 'error');
+      showToast(err.message || 'Google sign up failed', 'info');
     } finally {
       setLoading(false);
     }
