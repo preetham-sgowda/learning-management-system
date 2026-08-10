@@ -40,6 +40,8 @@ import {
   Timer
 } from 'lucide-react';
 
+import { profileApi, streakApi } from '../services/api';
+
 // Counting animation component
 const CountUp = memo(({ value, duration = 1.5 }) => {
   const motionValue = useMotionValue(0);
@@ -107,12 +109,38 @@ const StudentDashboard = memo(() => {
   const { showToast } = useUI();
   const navigate = useNavigate();
 
-  // Mock data for new features
+  const [liveStreak, setLiveStreak] = useState(null);
+  const [liveProfile, setLiveProfile] = useState(null);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const streak = await streakApi.getMyStreak();
+        if (streak) setLiveStreak(streak);
+      } catch (e) {
+        console.log('Streak API offline or error:', e.message);
+      }
+
+      try {
+        const profile = await profileApi.getMyProfile();
+        if (profile) setLiveProfile(profile);
+      } catch (e) {
+        console.log('Profile API offline or error:', e.message);
+      }
+    };
+    fetchDashboardData();
+  }, []);
+
+  // Quick stats computed with live profile data when available
+  const overallAcc = liveProfile?.overallAccuracyPercent
+    ? Math.round(liveProfile.overallAccuracyPercent)
+    : user?.codingAccuracy || 88;
+
   const quickStats = [
-    { icon: Code2, value: 142, label: 'Problems Solved', trend: '+12 this week', color: 'text-[#5B4E80]', bgColor: 'bg-[#F0EBFA]' },
+    { icon: Code2, value: user?.completedProblems || 84, label: 'Problems Solved', trend: '+12 this week', color: 'text-[#5B4E80]', bgColor: 'bg-[#F0EBFA]' },
     { icon: Target, value: 88, label: 'ATS Score', trend: '+5 this week', color: 'text-emerald-600', bgColor: 'bg-emerald-50' },
-    { icon: Trophy, value: 5, label: 'Current Rank', trend: 'Top 5%', color: 'text-amber-500', bgColor: 'bg-amber-50' },
-    { icon: TrendingUp, value: 92, label: 'Accuracy', trend: '+3% this week', color: 'text-blue-600', bgColor: 'bg-blue-50' },
+    { icon: Trophy, value: user?.rank || 14, label: 'Current Rank', trend: 'Top 5%', color: 'text-amber-500', bgColor: 'bg-amber-50' },
+    { icon: TrendingUp, value: overallAcc, label: 'Accuracy', trend: '+3% this week', color: 'text-blue-600', bgColor: 'bg-blue-50' },
   ];
 
   const xpProgress = { current: 2450, next: 3000, level: 12 };

@@ -9,21 +9,7 @@ export const UIProvider = ({ children }) => {
   const [unreadCount, setUnreadCount] = useState(2);
   const [toast, setToast] = useState(null);
 
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      try {
-        const notificationsRes = await fetch('/api/notifications');
-        if (notificationsRes.ok) {
-          const notificationsData = await notificationsRes.json();
-          setNotifications(notificationsData);
-          setUnreadCount(notificationsData.filter(n => !n.read).length);
-        }
-      } catch (err) {
-        console.log('Backend offline or error fetching notifications, using mock data.');
-      }
-    };
-    fetchNotifications();
-  }, []);
+// UI Context manages notifications, toast state, mobile menu, and theme
 
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type });

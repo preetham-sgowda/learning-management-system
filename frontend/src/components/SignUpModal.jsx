@@ -4,31 +4,42 @@ import { useAuth } from '../context/AuthContext';
 import { useUI } from '../context/UIContext';
 
 const SignUpModal = memo(() => {
-  const { login, register } = useAuth();
+  const { register, loginWithGoogle } = useAuth();
   const { showToast } = useUI();
   const navigate = useNavigate();
 
-  const [fullName, setFullName] = useState('Rakshith Y B');
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
+    setErrorMessage('');
+    try {
+      const res = await register(fullName, email, password);
+      if (res && !res.success && res.error) {
+        setErrorMessage(res.error);
+      }
+    } catch (err) {
+      setErrorMessage(err.message || 'Registration failed');
+    } finally {
       setLoading(false);
-      register(fullName, email, password);
-    }, 500);
+    }
   };
 
-  const handleGoogleSignUp = () => {
+  const handleGoogleSignUp = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      login('rakshith.google@skillforge.edu', 'google_auth');
+    try {
+      await loginWithGoogle();
       showToast('Signed up via Google OAuth successfully!', 'success');
-    }, 500);
+    } catch (err) {
+      showToast('Google sign up failed', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -94,6 +105,13 @@ const SignUpModal = memo(() => {
               OR FILL DETAILS
             </span>
           </div>
+
+          {errorMessage && (
+            <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 text-xs flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px]">error</span>
+              <span>{errorMessage}</span>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>

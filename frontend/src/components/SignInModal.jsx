@@ -4,31 +4,42 @@ import { useAuth } from '../context/AuthContext';
 import { useUI } from '../context/UIContext';
 
 const SignInModal = memo(() => {
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const { showToast } = useUI();
   const navigate = useNavigate();
 
-  const [email, setEmail] = useState('rakshith_test@oralai.com');
-  const [password, setPassword] = useState('••••••••');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
+    setErrorMessage('');
+    try {
+      const res = await login(email, password);
+      if (res && !res.success && res.error) {
+        setErrorMessage(res.error);
+      }
+    } catch (err) {
+      setErrorMessage(err.message || 'Login failed');
+    } finally {
       setLoading(false);
-      login(email, password);
-    }, 500);
+    }
   };
 
-  const handleGoogleSignIn = () => {
+  const handleGoogleSignIn = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      login('rakshith.google@skillforge.edu', 'google_auth');
+    try {
+      await loginWithGoogle();
       showToast('Signed in via Google OAuth successfully!', 'success');
-    }, 500);
+    } catch (err) {
+      showToast('Google sign in failed', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -100,6 +111,13 @@ const SignInModal = memo(() => {
               OR FILL DETAILS
             </span>
           </div>
+
+          {errorMessage && (
+            <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 text-xs flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px]">error</span>
+              <span>{errorMessage}</span>
+            </div>
+          )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">

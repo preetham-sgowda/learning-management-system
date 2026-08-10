@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { COURSES_DATA, PRACTICE_PROBLEMS } from '../data/mockData';
+import { courseApi, enrollmentApi, questionApi } from '../services/api';
 
 const CourseContext = createContext();
 
@@ -12,26 +13,45 @@ export const CourseProvider = ({ children, showToast }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const coursesRes = await fetch('/api/courses');
-        if (coursesRes.ok) {
-          const coursesData = await coursesRes.json();
-          setCourses(coursesData);
+        const backendCourses = await courseApi.listAll();
+        if (Array.isArray(backendCourses) && backendCourses.length > 0) {
+          // Merge backend courses with UI mock attributes (images, ratings, etc.) if missing
+          const merged = backendCourses.map((bc, idx) => {
+            const mock = COURSES_DATA[idx % COURSES_DATA.length] || {};
+            return {
+              ...mock,
+              id: bc.id,
+              title: bc.title || mock.title,
+              description: bc.description || mock.description,
+              category: bc.category || mock.category,
+              createdAt: bc.createdAt,
+            };
+          });
+          setCourses(merged);
         }
       } catch (err) {
         console.log('Backend offline or error fetching courses, using mock data.');
       }
 
+      // Fetch user enrollments if authenticated
       try {
-        const practiceRes = await fetch('/api/practice');
-        if (practiceRes.ok) {
-          const practiceData = await practiceRes.json();
-          setPracticeProblems(practiceData);
-          if (practiceData.length > 0) {
-            setActiveProblem(practiceData[0]);
-          }
+        const enrollments = await enrollmentApi.myEnrollments();
+        if (Array.isArray(enrollments) && enrollments.length > 0) {
+          const enrollmentMap = new Map(enrollments.map(e => [e.courseId, e]));
+          setCourses(prev => prev.map(c => {
+            const en = enrollmentMap.get(c.id);
+            if (en) {
+              return {
+                ...c,
+                status: en.progressPercent >= 100 ? 'Completed' : 'In Progress',
+                progress: en.progressPercent || c.progress || 5,
+              };
+            }
+            return c;
+          }));
         }
       } catch (err) {
-        console.log('Backend offline or error fetching practice problems, using mock data.');
+        console.log('Backend offline or error fetching enrollments.');
       }
     };
 
@@ -39,24 +59,18 @@ export const CourseProvider = ({ children, showToast }) => {
   }, []);
 
   const enrollCourse = useCallback(async (courseId) => {
+    // Optimistic UI update
     setCourses(prev => prev.map(c => {
       if (c.id === courseId) {
-        return { ...c, status: 'In Progress', progress: Math.max(c.progress, 5) };
+        return { ...c, status: 'In Progress', progress: Math.max(c.progress || 0, 5) };
       }
       return c;
     }));
 
     try {
-      const token = localStorage.getItem('skillforge_token');
-      await fetch(`/api/courses/${courseId}/enroll`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-      });
+      await enrollmentApi.enroll(courseId);
     } catch (err) {
-      console.log('Backend offline, enrolled course updated locally.');
+      console.log('Backend error enrolling course, updated locally.', err);
     }
 
     if (showToast) {
@@ -114,3 +128,4 @@ export const useCourse = () => {
 };
 
 export default CourseContext;
+

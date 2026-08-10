@@ -11,15 +11,10 @@ export default defineConfig({
     allowedHosts: true,
 
     proxy: {
-      '/api/auth': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-        secure: false,
-      },
       '/api': {
-        target: 'http://localhost:5000',
+        target: 'https://learning-management-system-1-i9my.onrender.com',
         changeOrigin: true,
-        secure: false,
+        secure: true,
       },
     },
   },

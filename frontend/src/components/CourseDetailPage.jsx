@@ -26,6 +26,7 @@ import {
   HelpCircle
 } from 'lucide-react';
 import { useCourse } from '../context/CourseContext';
+import { courseApi } from '../services/api';
 
 const CourseDetailPage = memo(() => {
   const { courseId } = useParams();
@@ -36,12 +37,38 @@ const CourseDetailPage = memo(() => {
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'syllabus' | 'instructor' | 'reviews'
+  const [backendModules, setBackendModules] = useState(null);
 
   // Find course matching URL courseId param, fallback to first course
   const course = courses.find((c) => c.id === courseId) || courses[0];
 
   useEffect(() => {
     window.scrollTo(0, 0);
+  }, [courseId]);
+
+  useEffect(() => {
+    const fetchModulesAndArticles = async () => {
+      if (!courseId) return;
+      try {
+        const modules = await courseApi.getModules(courseId);
+        if (Array.isArray(modules) && modules.length > 0) {
+          const modulesWithArticles = await Promise.all(
+            modules.map(async (mod) => {
+              try {
+                const articles = await courseApi.getArticles(mod.id);
+                return { ...mod, articles: articles || [] };
+              } catch (e) {
+                return { ...mod, articles: [] };
+              }
+            })
+          );
+          setBackendModules(modulesWithArticles);
+        }
+      } catch (err) {
+        console.log('Backend modules not available for this course, using mock data.');
+      }
+    };
+    fetchModulesAndArticles();
   }, [courseId]);
 
   if (!course) {
