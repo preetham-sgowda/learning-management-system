@@ -1,0 +1,116 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #EEEEEE;
+    color: #1a1c1c;
+    font-family: 'Inter', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Montserrat', sans-serif;
+  }
+}
+
+/* Custom Glassmorphic & 3D styling */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.glass-panel-light {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.06);
+}
+
+.code-bg {
+  background-color: #05070a;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* 3D Isometric Transforms */
+.iso-container {
+  perspective: 2000px;
+  transform-style: preserve-3d;
+}
+
+.iso-card {
+  transform: rotateX(20deg) rotateY(-30deg) rotateZ(5deg);
+  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.iso-card:hover {
+  transform: rotateX(15deg) rotateY(-25deg) rotateZ(3deg) translateZ(30px);
+}
+
+/* Heatmap cells */
+.heatmap-cell {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.heatmap-cell:hover {
+  transform: scale(1.3);
+  z-index: 10;
+}
+
+.heatmap-0 { background-color: #e5e7eb; }
+.heatmap-1 { background-color: #fca5a5; }
+.heatmap-2 { background-color: #ef4444; }
+.heatmap-3 { background-color: #b91c1c; }
+.heatmap-4 { background-color: #810B38; }
+
+/* Custom Animations */
+@keyframes float {
+  0% { transform: translateY(0px) rotateX(20deg) rotateY(-30deg) rotateZ(5deg); }
+  50% { transform: translateY(-15px) rotateX(22deg) rotateY(-28deg) rotateZ(6deg); }
+  100% { transform: translateY(0px) rotateX(20deg) rotateY(-30deg) rotateZ(5deg); }
+}
+
+.float-animation {
+  animation: float 6s ease-in-out infinite;
+}
+
+.float-animation-delayed {
+  animation: float 8s ease-in-out infinite;
+  animation-delay: -2s;
+}
+
+.float-animation-fast {
+  animation: float 5s ease-in-out infinite;
+  animation-delay: -4s;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.05); }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 4s ease-in-out infinite;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(129, 11, 56, 0.4);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(129, 11, 56, 0.7);
+}
