@@ -93,4 +93,54 @@ export function onSupabaseAuthStateChange(callback) {
   return () => subscription.unsubscribe();
 }
 
+/**
+ * Upsert a user profile row in the Supabase `profiles` table.
+ * Called after successful sign-up or sign-in to ensure the user
+ * exists in the database (not just in Supabase Auth).
+ */
+export async function upsertProfile(user) {
+  if (!supabase || !user) return null;
+
+  const profileData = {
+    id: user.id,
+    email: user.email,
+    full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || '',
+    avatar_url: user.user_metadata?.avatar_url || null,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .upsert(profileData, { onConflict: 'id' })
+    .select()
+    .single();
+
+  if (error) {
+    console.warn('[Supabase] Profile upsert failed:', error.message);
+    return null;
+  }
+
+  return data;
+}
+
+/**
+ * Fetch a user profile from the Supabase `profiles` table.
+ */
+export async function getProfile(userId) {
+  if (!supabase || !userId) return null;
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
+
+  if (error) {
+    console.warn('[Supabase] Profile fetch failed:', error.message);
+    return null;
+  }
+
+  return data;
+}
+
 export default supabase;

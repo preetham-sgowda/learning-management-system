@@ -13,14 +13,18 @@ const SignUpModal = memo(() => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setErrorMessage('');
+    setSuccessMessage('');
     try {
       const res = await register(fullName, email, password);
-      if (res && !res.success && res.error) {
+      if (res && res.confirmationRequired) {
+        setSuccessMessage(res.message || 'Please check your email to confirm your account.');
+      } else if (res && !res.success && res.error) {
         setErrorMessage(res.error);
       }
     } catch (err) {
@@ -32,11 +36,12 @@ const SignUpModal = memo(() => {
 
   const handleGoogleSignUp = async () => {
     setLoading(true);
+    setErrorMessage('');
     try {
       await loginWithGoogle();
-      showToast('Signed up via Google OAuth successfully!', 'success');
+      // If we get here without redirect, the OAuth redirect is in progress
     } catch (err) {
-      showToast(err.message || 'Google sign up failed', 'info');
+      setErrorMessage(err.message || 'Google sign up failed');
     } finally {
       setLoading(false);
     }
@@ -110,6 +115,13 @@ const SignUpModal = memo(() => {
             <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 text-xs flex items-center gap-2">
               <span className="material-symbols-outlined text-[18px]">error</span>
               <span>{errorMessage}</span>
+            </div>
+          )}
+
+          {successMessage && (
+            <div className="p-3 bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800 rounded-xl text-green-700 dark:text-green-300 text-xs flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px]">check_circle</span>
+              <span>{successMessage}</span>
             </div>
           )}
 

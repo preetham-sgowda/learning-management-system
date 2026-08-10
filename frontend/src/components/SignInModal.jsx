@@ -32,11 +32,12 @@ const SignInModal = memo(() => {
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
+    setErrorMessage('');
     try {
       await loginWithGoogle();
-      showToast('Signed in via Google OAuth successfully!', 'success');
+      // If we get here without redirect, the OAuth redirect is in progress
     } catch (err) {
-      showToast(err.message || 'Google sign in failed', 'info');
+      setErrorMessage(err.message || 'Google sign in failed');
     } finally {
       setLoading(false);
     }

@@ -8,7 +8,9 @@ import {
   signInWithGoogleSupabase, 
   signOutSupabase, 
   getSupabaseSession, 
-  onSupabaseAuthStateChange 
+  onSupabaseAuthStateChange,
+  upsertProfile,
+  getProfile 
 } from '../services/supabase';
 
 const AuthContext = createContext();
@@ -17,6 +19,17 @@ export const AuthProvider = ({ children, onLoginSuccess, onLogoutSuccess }) => {
   const [user, setUser] = useState(INITIAL_USER);
   const [isAuthenticated, setIsAuthenticated] = useState(Boolean(getStoredAccessToken()));
   const [loading, setLoading] = useState(true);
+
+  // Helper: build user state from a Supabase user object + optional profile
+  const buildUserFromSupabase = useCallback((supaUser, profile = null) => {
+    const fullName = profile?.full_name || supaUser.user_metadata?.full_name || supaUser.email?.split('@')[0] || INITIAL_USER.name;
+    return {
+      ...INITIAL_USER,
+      email: supaUser.email,
+      name: fullName,
+      avatar: fullName.substring(0, 2).toUpperCase(),
+    };
+  }, []);
 
   // Synchronize Supabase session changes
   useEffect(() => {
@@ -32,31 +45,35 @@ export const AuthProvider = ({ children, onLoginSuccess, onLogoutSuccess }) => {
           if (session.refresh_token) {
             localStorage.setItem('refreshToken', session.refresh_token);
           }
-          setUser(prev => ({
-            ...prev,
-            email: supaUser.email,
-            name: supaUser.user_metadata?.full_name || supaUser.email?.split('@')[0] || prev.name,
-          }));
+
+          // Fetch or create profile in Supabase DB
+          let profile = await getProfile(supaUser.id);
+          if (!profile) {
+            profile = await upsertProfile(supaUser);
+          }
+
+          setUser(buildUserFromSupabase(supaUser, profile));
           setIsAuthenticated(true);
           setLoading(false);
           return;
         }
 
-        unsubscribe = onSupabaseAuthStateChange((event, session) => {
+        unsubscribe = onSupabaseAuthStateChange(async (event, session) => {
           if (session && session.user) {
             localStorage.setItem('accessToken', session.access_token);
             if (session.refresh_token) {
               localStorage.setItem('refreshToken', session.refresh_token);
             }
-            setUser(prev => ({
-              ...prev,
-              email: session.user.email,
-              name: session.user.user_metadata?.full_name || prev.name,
-            }));
+
+            // Upsert profile on auth state change (e.g., Google OAuth redirect)
+            const profile = await upsertProfile(session.user);
+
+            setUser(buildUserFromSupabase(session.user, profile));
             setIsAuthenticated(true);
           } else if (event === 'SIGNED_OUT') {
             clearAuthTokens();
             setIsAuthenticated(false);
+            setUser(INITIAL_USER);
           }
         });
       }
@@ -92,7 +109,7 @@ export const AuthProvider = ({ children, onLoginSuccess, onLogoutSuccess }) => {
     initializeAuth();
 
     return () => unsubscribe();
-  }, []);
+  }, [buildUserFromSupabase]);
 
   const login = useCallback(async (email, password) => {
     // 1. Try Supabase Auth if configured
@@ -104,34 +121,31 @@ export const AuthProvider = ({ children, onLoginSuccess, onLogoutSuccess }) => {
           if (data.session.refresh_token) {
             localStorage.setItem('refreshToken', data.session.refresh_token);
           }
-          const fullName = data.user.user_metadata?.full_name || data.user.email?.split('@')[0];
-          setUser({
-            ...INITIAL_USER,
-            email: data.user.email,
-            name: fullName,
-          });
+
+          // Store/update profile in Supabase DB
+          const profile = await upsertProfile(data.user);
+
+          const fullName = profile?.full_name || data.user.user_metadata?.full_name || data.user.email?.split('@')[0];
+          setUser(buildUserFromSupabase(data.user, profile));
           setIsAuthenticated(true);
 
-          // Sync with Spring Boot backend in background if needed
+          // Sync with Spring Boot backend in background (non-blocking, logged)
           try {
             await authApi.login(email, password);
           } catch (e) {
-            /* optional sync error ignore */
+            console.warn('[Auth] Backend sync failed (non-critical):', e.message);
           }
 
           if (onLoginSuccess) onLoginSuccess(fullName);
           return { success: true, data };
         }
       } catch (supaErr) {
-        console.log('Supabase sign-in error:', supaErr.message);
-        // If Supabase throws invalid credentials, report error
-        if (supaErr.message?.toLowerCase().includes('invalid')) {
-          return { success: false, error: supaErr.message };
-        }
+        console.error('[Auth] Supabase sign-in error:', supaErr.message);
+        return { success: false, error: supaErr.message };
       }
     }
 
-    // 2. Fallback to Spring Boot Backend API
+    // 2. Fallback to Spring Boot Backend API (only if Supabase is not configured)
     try {
       const authData = await authApi.login(email, password);
       if (authData && authData.accessToken) {
@@ -148,18 +162,12 @@ export const AuthProvider = ({ children, onLoginSuccess, onLogoutSuccess }) => {
         return { success: true, data: authData };
       }
     } catch (err) {
-      console.log('Backend auth offline or failed, using demo login.', err);
-      setIsAuthenticated(true);
-      setUser({
-        ...INITIAL_USER,
-        email: email || INITIAL_USER.email,
-      });
-      if (onLoginSuccess) {
-        onLoginSuccess(INITIAL_USER.name);
-      }
-      return { success: false, error: err.message };
+      console.error('[Auth] Backend login failed:', err.message);
+      return { success: false, error: err.message || 'Login failed. Please check your credentials and try again.' };
     }
-  }, [onLoginSuccess]);
+
+    return { success: false, error: 'Login failed. Please try again.' };
+  }, [onLoginSuccess, buildUserFromSupabase]);
 
   const register = useCallback(async (name, email, password) => {
     // 1. Try Supabase Auth if configured
@@ -173,33 +181,41 @@ export const AuthProvider = ({ children, onLoginSuccess, onLogoutSuccess }) => {
               localStorage.setItem('refreshToken', data.session.refresh_token);
             }
           }
-          const userFullName = name || data.user?.email?.split('@')[0];
-          setUser({
-            ...INITIAL_USER,
-            email: email,
-            name: userFullName,
-          });
+
+          // Store profile in Supabase DB
+          const profile = await upsertProfile(data.user);
+
+          const userFullName = profile?.full_name || name || data.user?.email?.split('@')[0];
+          setUser(buildUserFromSupabase(data.user, profile));
           setIsAuthenticated(true);
 
-          // Sync with Spring Boot backend
+          // Sync with Spring Boot backend (non-blocking, logged)
           try {
             await authApi.register(email, password, name);
           } catch (e) {
-            /* backend sync */
+            console.warn('[Auth] Backend sync failed (non-critical):', e.message);
           }
 
           if (onLoginSuccess) onLoginSuccess(userFullName);
           return { success: true, data };
         }
-      } catch (supaErr) {
-        console.log('Supabase sign-up error:', supaErr.message);
-        if (supaErr.message) {
-          return { success: false, error: supaErr.message };
+
+        // Supabase may require email confirmation — user exists but no session yet
+        if (data && data.user && !data.session) {
+          return { 
+            success: true, 
+            data, 
+            confirmationRequired: true,
+            message: 'Please check your email to confirm your account before signing in.' 
+          };
         }
+      } catch (supaErr) {
+        console.error('[Auth] Supabase sign-up error:', supaErr.message);
+        return { success: false, error: supaErr.message };
       }
     }
 
-    // 2. Fallback to Spring Boot Backend API
+    // 2. Fallback to Spring Boot Backend API (only if Supabase is not configured)
     try {
       const authData = await authApi.register(email, password, name);
       if (authData && authData.accessToken) {
@@ -216,38 +232,33 @@ export const AuthProvider = ({ children, onLoginSuccess, onLogoutSuccess }) => {
         return { success: true, data: authData };
       }
     } catch (err) {
-      console.log('Backend registration failed, using demo register.', err);
-      setIsAuthenticated(true);
-      setUser({
-        ...INITIAL_USER,
-        name: name || INITIAL_USER.name,
-        email: email || INITIAL_USER.email,
-      });
-      if (onLoginSuccess) {
-        onLoginSuccess(name || INITIAL_USER.name);
-      }
-      return { success: false, error: err.message };
+      console.error('[Auth] Backend registration failed:', err.message);
+      return { success: false, error: err.message || 'Registration failed. Please try again.' };
     }
-  }, [onLoginSuccess]);
+
+    return { success: false, error: 'Registration failed. Please try again.' };
+  }, [onLoginSuccess, buildUserFromSupabase]);
 
   const loginWithGoogle = useCallback(async () => {
     if (supabase) {
       try {
         const data = await signInWithGoogleSupabase();
-        if (data) return;
+        // signInWithOAuth redirects the browser — if it returns without error, the redirect is in progress
+        if (data) return { success: true };
       } catch (err) {
-        console.log('Supabase Google OAuth provider not enabled, completing authenticated session seamlessly.', err.message);
+        console.error('[Auth] Google OAuth error:', err.message);
+        // Surface the actual error instead of silently faking a login
+        throw new Error(
+          err.message?.includes('provider')
+            ? 'Google sign-in is not enabled. Please use email and password to sign in, or contact support.'
+            : err.message || 'Google sign-in failed. Please try again.'
+        );
       }
     }
-    // Authenticate user session
-    setIsAuthenticated(true);
-    setUser({
-      ...INITIAL_USER,
-      email: 'student.google@skillforge.edu',
-      name: 'Rakshith Y B (Google)',
-    });
-    if (onLoginSuccess) onLoginSuccess('Rakshith Y B');
-  }, [onLoginSuccess]);
+
+    // If Supabase is not configured, Google OAuth is not available
+    throw new Error('Google sign-in is not configured. Please use email and password to sign in.');
+  }, []);
 
   const logout = useCallback(async () => {
     await signOutSupabase();
